@@ -1,0 +1,288 @@
+{
+  "cells": [
+    {
+      "cell_type": "code",
+      "source": [
+        "import os\r\n",
+        "import argparse\r\n",
+        "import pandas as pd\r\n",
+        "import mlflow\r\n",
+        "import mlflow.sklearn\r\n",
+        "from sklearn.ensemble import GradientBoostingClassifier\r\n",
+        "from sklearn.metrics import classification_report\r\n",
+        "from sklearn.model_selection import train_test_split"
+      ],
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "gather": {
+          "logged": 1688682753703
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from azure.ai.ml import MLClient\r\n",
+        "from azure.identity import DefaultAzureCredential\r\n",
+        "from azure.ai.ml.entities import Data\r\n",
+        "from azure.ai.ml.constants import AssetTypes\r\n",
+        "\r\n",
+        "#authenticate\r\n",
+        "credential = DefaultAzureCredential()\r\n",
+        "\r\n",
+        "ml_client = MLClient(\r\n",
+        "    credential=credential,\r\n",
+        "    subscription_id=\"c6fb9fd9-644b-44c5-8e1f-2ea146326c95\",\r\n",
+        "    resource_group_name=\"Alexander.Dunnett-rg\",\r\n",
+        "    workspace_name=\"demo-alexplore\"\r\n",
+        ")"
+      ],
+      "outputs": [],
+      "execution_count": 3,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688682768700
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "data_asset = ml_client.data.get(name=\"credit_card\",version=\"2023.07.06.22.03.34_cleaned\")\r\n",
+        "df = pd.read_parquet(data_asset.path)"
+      ],
+      "outputs": [],
+      "execution_count": 14,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688683287757
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "X_train, X_test, y_train, y_test = train_test_split(df.drop('default',axis=1), df['default'], test_size=0.25, random_state=42)"
+      ],
+      "outputs": [],
+      "execution_count": 24,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688683614862
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "#using MLflow to track development: w/ autologging\r\n",
+        "mlflow.set_experiment(\"Develop on cloud tutorial\")\r\n",
+        "mlflow.sklearn.autolog()"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": "2023/07/06 22:48:09 INFO mlflow.tracking.fluent: Experiment with name 'Develop on cloud tutorial' does not exist. Creating a new experiment.\n2023/07/06 22:48:09 WARNING mlflow.utils.autologging_utils: You are using an unsupported version of sklearn. If you encounter errors during autologging, try upgrading / downgrading sklearn to a supported version, or try upgrading MLflow.\n"
+        }
+      ],
+      "execution_count": 26,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688683690435
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "mlflow.start_run()\r\n",
+        "clf = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1)\r\n",
+        "clf.fit(X_train,y_train)\r\n",
+        "y_pred = clf.predict(X_test)\r\n",
+        "classification_report(y_test,y_pred)\r\n",
+        "mlflow.end_run()"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": "2023/07/06 22:50:02 WARNING mlflow.utils.autologging_utils: MLflow autologging encountered a warning: \"/anaconda/envs/azureml_py310_sdkv2/lib/python3.10/site-packages/mlflow/models/signature.py:130: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.\"\n2023/07/06 22:50:05 WARNING mlflow.utils.autologging_utils: MLflow autologging encountered a warning: \"/anaconda/envs/azureml_py310_sdkv2/lib/python3.10/site-packages/_distutils_hack/__init__.py:33: UserWarning: Setuptools is replacing distutils.\"\n"
+        }
+      ],
+      "execution_count": 28,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688683807953
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "#Try random forest\r\n",
+        "from sklearn.ensemble import RandomForestClassifier\r\n",
+        "\r\n",
+        "mlflow.start_run()\r\n",
+        "rnd = RandomForestClassifier(n_estimators=100,max_depth=10,random_state=42)\r\n",
+        "rnd.fit(X_train,y_train)\r\n",
+        "y_pred = rnd.predict(X_test)\r\n",
+        "classification_report(y_test,y_pred)\r\n",
+        "mlflow.end_run()"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": "2023/07/06 22:53:39 WARNING mlflow.utils.autologging_utils: MLflow autologging encountered a warning: \"/anaconda/envs/azureml_py310_sdkv2/lib/python3.10/site-packages/mlflow/models/signature.py:130: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.\"\n"
+        }
+      ],
+      "execution_count": 29,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688684023752
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "classification_report(y_test,y_pred)"
+      ],
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "execution_count": 30,
+          "data": {
+            "text/plain": "'              precision    recall  f1-score   support\\n\\n           0       0.84      0.95      0.89      5873\\n           1       0.67      0.36      0.47      1627\\n\\n    accuracy                           0.82      7500\\n   macro avg       0.76      0.65      0.68      7500\\nweighted avg       0.81      0.82      0.80      7500\\n'"
+          },
+          "metadata": {}
+        }
+      ],
+      "execution_count": 30,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1688684130115
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "outputs": [],
+      "execution_count": null,
+      "metadata": {
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python310-sdkv2",
+      "language": "python",
+      "display_name": "Python 3.10 - SDK v2"
+    },
+    "language_info": {
+      "name": "python",
+      "version": "3.10.10",
+      "mimetype": "text/x-python",
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "pygments_lexer": "ipython3",
+      "nbconvert_exporter": "python",
+      "file_extension": ".py"
+    },
+    "microsoft": {
+      "ms_spell_check": {
+        "ms_spell_check_language": "en"
+      },
+      "host": {
+        "AzureML": {
+          "notebookHasBeenCompleted": true
+        }
+      }
+    },
+    "kernel_info": {
+      "name": "python310-sdkv2"
+    },
+    "nteract": {
+      "version": "nteract-front-end@1.0.0"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 2
+}
